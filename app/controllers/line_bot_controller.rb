@@ -24,10 +24,7 @@ class LineBotController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          message = {
-            type: 'text',
-            text: event.message['text']
-          }
+          message = search_and_create_message(event.message['text'])
           client.reply_message(event['replyToken'], message)
         end
       end
@@ -46,4 +43,38 @@ class LineBotController < ApplicationController
     }
   end
 
+  def search_and_create_message(keyword)
+    http_client = HTTPClient.new
+    url = 'https://app.rakuten.co.jp/services/api/Travel/KeywordHotelSearch/20170426'
+    query = {
+      'keyword' => keyword,
+      'applicationId' => ENV['RAKUTEN_APPID'],
+      'hits' => 5,
+      'responseType' => 'small',
+      'formatVersion' => 2
+    }
+    response = http_client.get(url, query)
+    response = JSON.parse(response.body)
+
+    if response.key?('error')
+      text = "この検索条件に該当する宿泊施設が見つかりませんでした。\n条件を変えて再検索してください。"
+    else
+    # 変数 = ''のように変数に空文字を初期値とすると、Stringクラスの変数として宣言できる。
+      text =''
+      response['hotels'].each do |hotel|
+
+        # <<演算子(Stringクラスの値でのみ使える)
+        text <<
+          hotel[0]['hotelBasicInfo']['hotelName'] + "\n" +
+          hotel[0]['hotelBasicInfo']['hotelInformationUrl'] + "\n" +
+          "\n"
+      end
+    end
+
+    message = {
+      type: 'text',
+      text: text
+    }
+
+  end
 end
